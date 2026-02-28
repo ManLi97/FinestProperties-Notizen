@@ -1,0 +1,9 @@
+{
+  "name": "Finest Properties Notes Showcase",
+  "short_name": "FP Notes",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f4f7fb",
+  "theme_color": "#102a43",
+  "description": "Offline Notes Showcase mit lokaler Speicherung in IndexedDB."
+}
