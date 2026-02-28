@@ -98,13 +98,45 @@ function docListTemplate(docs) {
   return `<ul class="docs-list">${items}</ul>`;
 }
 
-function viewHome() {
+function buildHomeListMarkup() {
+  const query = state.query.trim();
+  const scored = query ? scoreDocs(state.docs, query) : [];
+  const noResults = query && scored.length === 0;
+  const suggestion = state.recent[0];
+
   return `
-    <section class="card stack">
+    ${
+      noResults
+        ? `<p class="hint">Leider nichts gefunden "${escapeHtml(query)}".</p>`
+        : query
+          ? "<p class=\"hint\">Suchergebnisse</p>"
+          : "<p class=\"hint\">Kuerzlich hochgeladen</p>"
+    }
+    ${query ? docListTemplate(scored) : docListTemplate(state.recent)}
+    ${
+      noResults && suggestion
+        ? `<div class="card">
+            <strong>Vorschlag:</strong>
+            <button class="doc-link" data-open-id="${suggestion.id}">
+              ${escapeHtml(suggestion.description)} (${formatDateTime(suggestion.createdAt)})
+            </button>
+          </div>`
+        : ""
+    }
+  `;
+}
+
+function viewHome() {
+
+  return `
+    <section class="card stack home-actions">
       <h1 class="title">Notiz-Showcase</h1>
-      <p class="hint">Schnell Notizen/Bilder speichern und später wiederfinden.</p>
+      <p class="hint">Dokumente direkt suchen oder mit einem Tip neu hinzufügen.</p>
       <button class="primary-btn" id="go-add">Dokument hinzufügen</button>
-      <button class="secondary-btn" id="go-find">Dokument finden</button>
+    </section>
+    <section class="card stack home-results" id="home-results-container">
+      <input id="search-input" type="search" placeholder="Beschreibung suchen..." value="${escapeHtml(state.query)}" />
+      <div class="stack" id="home-list-container">${buildHomeListMarkup()}</div>
     </section>
   `;
 }
@@ -135,46 +167,6 @@ function viewAdd() {
   `;
 }
 
-function viewFind() {
-  const query = state.query.trim();
-  const scored = query ? scoreDocs(state.docs, query) : [];
-  const noResults = query && scored.length === 0;
-  const suggestion = state.recent[0];
-  return `
-    <section class="card stack">
-      <h1 class="title">Dokument finden</h1>
-      <input id="search-input" type="search" placeholder="Beschreibung suchen..." value="${escapeHtml(state.query)}" />
-      ${
-        noResults
-          ? `<p class="hint">Leider nichts gefunden "${escapeHtml(query)}".</p>`
-          : query
-            ? "<p class=\"hint\">Suchergebnisse</p>"
-            : "<p class=\"hint\">kürzlich hochgeladen</p>"
-      }
-      ${query ? docListTemplate(scored) : docListTemplate(state.recent)}
-      ${
-        noResults && suggestion
-          ? `<div class="card">
-              <strong>Vorschlag:</strong>
-              <button class="doc-link" data-open-id="${suggestion.id}">
-                ${escapeHtml(suggestion.description)} (${formatDateTime(suggestion.createdAt)})
-              </button>
-            </div>`
-          : ""
-      }
-      ${
-        noResults
-          ? `<div class="stack">
-               <p class="hint">Kuerzlich hochgeladen</p>
-               ${docListTemplate(state.recent)}
-             </div>`
-          : ""
-      }
-      <button class="ghost-btn" id="back-home">Zurueck</button>
-    </section>
-  `;
-}
-
 async function viewDetail() {
   const doc = state.selectedId ? await getDoc(state.selectedId) : null;
   if (!doc) {
@@ -182,7 +174,7 @@ async function viewDetail() {
       <section class="card stack">
         <h1 class="title">Dokumentdetails</h1>
         <p class="hint">Dokument nicht gefunden.</p>
-        <button class="ghost-btn" id="go-find">Zurück zu Dokument finden</button>
+        <button class="ghost-btn" id="go-home">Zurueck zur Startseite</button>
       </section>
     `;
   }
@@ -245,9 +237,9 @@ function getTutorialSteps() {
       text: "Tippe auf Dokument hinzufügen, um ein Foto einer Notiz oder Karte schnell abzulegen.",
     },
     {
-      route: "find",
+      route: "home",
       targetSelector: "#search-input",
-      text: "Hier findest du deine Dokumente wieder. Suche oben direkt über die Beschreibung.",
+      text: "Hier findest du deine Dokumente sofort wieder. Suche direkt ueber die Beschreibung.",
     },
     {
       route: "add",
@@ -284,24 +276,81 @@ async function handleFilePick(file) {
   await render();
 }
 
-async function bindEvents() {
-  document.querySelector("#help-btn")?.addEventListener("click", () => openTutorial());
-  document.querySelector("#go-add")?.addEventListener("click", () => navigate("add"));
-  document.querySelector("#go-find")?.addEventListener("click", () => navigate("find"));
-  document.querySelector("#back-home")?.addEventListener("click", () => navigate("home"));
-  document.querySelector("#back-find")?.addEventListener("click", () => navigate("find"));
-
+function bindDocOpenLinks() {
   document.querySelectorAll("[data-open-id]").forEach((node) => {
     node.addEventListener("click", () => navigate("detail", node.getAttribute("data-open-id")));
   });
+}
 
+function bindHomeSearch() {
   const searchInput = document.querySelector("#search-input");
-  if (searchInput) {
-    searchInput.addEventListener("input", async (event) => {
-      state.query = event.target.value;
-      await render();
-    });
+  if (!searchInput) {
+    return;
   }
+
+  // Non-trivial bug fix: updating only the home results avoids input blur after each keypress.
+  searchInput.addEventListener("input", (event) => {
+    state.query = event.target.value;
+    if (state.route === "home") {
+      renderHomeResults();
+    }
+  });
+
+  // Non-trivial bug fix: ensure Delete/Backspace editing remains reliable in all environments.
+  searchInput.addEventListener("keydown", (event) => {
+    const isBackspace = event.key === "Backspace";
+    const isDelete = event.key === "Delete" || event.key === "Entf" || event.key === "Del";
+    if (!isBackspace && !isDelete) {
+      return;
+    }
+
+    const input = event.currentTarget;
+    const value = input.value;
+    const start = input.selectionStart ?? value.length;
+    const end = input.selectionEnd ?? value.length;
+    let nextValue = value;
+    let caret = start;
+
+    if (start !== end) {
+      nextValue = value.slice(0, start) + value.slice(end);
+      caret = start;
+    } else if (isBackspace && start > 0) {
+      nextValue = value.slice(0, start - 1) + value.slice(end);
+      caret = start - 1;
+    } else if (isDelete && start < value.length) {
+      nextValue = value.slice(0, start) + value.slice(start + 1);
+      caret = start;
+    }
+
+    if (nextValue !== value) {
+      event.preventDefault();
+      input.value = nextValue;
+      input.setSelectionRange(caret, caret);
+      state.query = nextValue;
+      renderHomeResults();
+    }
+  });
+}
+
+function renderHomeResults() {
+  const listContainer = document.querySelector("#home-list-container");
+  if (!listContainer || state.route !== "home") {
+    return;
+  }
+
+  listContainer.innerHTML = buildHomeListMarkup();
+  bindDocOpenLinks();
+}
+
+async function bindEvents() {
+  document.querySelector("#help-btn")?.addEventListener("click", () => openTutorial());
+  document.querySelector("#go-add")?.addEventListener("click", () => navigate("add"));
+  document.querySelector("#go-home")?.addEventListener("click", () => navigate("home"));
+  document.querySelector("#back-home")?.addEventListener("click", () => navigate("home"));
+  document.querySelector("#back-find")?.addEventListener("click", () => navigate("home"));
+
+  bindDocOpenLinks();
+  bindHomeSearch();
 
   const fileInput = document.querySelector("#file-input");
   if (fileInput) {
@@ -354,7 +403,7 @@ async function bindEvents() {
     state.addDraft = { originalFile: null, processed: null, description: defaultDescription() };
     await refreshCollections();
     showToast("Gespeichert");
-    await navigate("find");
+    await navigate("home");
   });
 
   document.querySelector("#save-detail")?.addEventListener("click", async () => {
@@ -382,7 +431,7 @@ async function bindEvents() {
     await deleteDoc(state.selectedId);
     await refreshCollections();
     showToast("Dokument gelöscht");
-    await navigate("find");
+    await navigate("home");
   });
 
   document.querySelector("#detail-image")?.addEventListener("click", (event) => {
@@ -402,8 +451,6 @@ async function render() {
     content = viewHome();
   } else if (state.route === "add") {
     content = viewAdd();
-  } else if (state.route === "find") {
-    content = viewFind();
   } else if (state.route === "detail") {
     content = await viewDetail();
   }

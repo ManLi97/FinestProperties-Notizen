@@ -86,6 +86,20 @@ body {
   padding: 16px;
 }
 
+.home-actions {
+  margin-bottom: 12px;
+}
+
+.home-results {
+  min-height: 0;
+}
+
+#search-input {
+  min-height: 38px;
+  padding: 9px 12px;
+  font-size: 0.9rem;
+}
+
 .stack {
   display: grid;
   gap: 12px;
