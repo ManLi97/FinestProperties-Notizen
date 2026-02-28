@@ -314,6 +314,8 @@ button:focus-visible {
   pointer-events: auto;
   z-index: 54;
   box-shadow: var(--shadow);
+  border-color: var(--primary);
+  background: #151515;
 }
 
 .tutorial-bubble .stack {
@@ -325,7 +327,20 @@ button:focus-visible {
   border: 2px solid var(--primary);
   z-index: 52;
   pointer-events: none;
-  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.62);
+  box-shadow: 0 0 0 2px #ec690733, 0 0 18px #ec690780;
+  animation: tutorialPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes tutorialPulse {
+  0% {
+    box-shadow: 0 0 0 2px #ec690722, 0 0 10px #ec690755;
+  }
+  50% {
+    box-shadow: 0 0 0 5px #ec690744, 0 0 22px #ec6907aa;
+  }
+  100% {
+    box-shadow: 0 0 0 2px #ec690722, 0 0 10px #ec690755;
+  }
 }
 
 @media (min-width: 721px) {
