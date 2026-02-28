@@ -1,4 +1,8 @@
-const CACHE_NAME = "fp-notes-showcase-v1";
+// Purpose: Keep showcase available offline without trapping users on stale UI assets.
+// Contract: Try network first for freshness, then fall back to cache offline.
+// Verify: After a UI change, reload once and confirm newest CSS/JS is applied.
+
+const CACHE_NAME = "fp-notes-showcase-v2";
 const ASSETS = [
   "./",
   "./index.html",
@@ -13,6 +17,7 @@ const ASSETS = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
@@ -21,6 +26,7 @@ self.addEventListener("activate", (event) => {
       Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))),
     ),
   );
+  self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
@@ -29,15 +35,14 @@ self.addEventListener("fetch", (event) => {
   }
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) {
-        return cached;
-      }
-      return fetch(event.request).then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+    fetch(event.request)
+      .then((response) => {
+        if (response && response.status === 200) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        }
         return response;
-      });
-    }),
+      })
+      .catch(() => caches.match(event.request)),
   );
 });

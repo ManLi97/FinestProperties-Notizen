@@ -43,22 +43,29 @@ function escapeHtml(text) {
 }
 
 function defaultDescription() {
-  return `Note - ${formatDateTime(Date.now())}`;
+  return `Notiz - ${formatDateTime(Date.now())}`;
 }
 
 function baseLayout(content) {
   return `
     <main class="page">
       <div class="topbar">
-        <div class="brand">Finest Properties</div>
-        <button class="help-btn" id="help-btn" aria-label="Tutorial starten">?</button>
+        <div class="brand-wrap">
+          <img
+            class="brand-logo"
+            src="https://www.finestpropertiesmallorca.com/typo3conf/ext/finpropcore/Resources/Public/Logos/logo-desktop.png"
+            alt="Finest Properties Mallorca"
+          />
+          <p class="brand-tagline">Notiz-Showcase</p>
+        </div>
+        <button class="help-btn" id="help-btn" aria-label="Tutorial starten">Hilfe</button>
       </div>
       ${content}
     </main>
     ${state.toastMessage ? `<div class="toast">${state.toastMessage}</div>` : ""}
     ${
       state.zoomUrl
-        ? `<div class="zoom-overlay" id="zoom-overlay"><img src="${state.zoomUrl}" alt="Zoomed note image" /></div>`
+        ? `<div class="zoom-overlay" id="zoom-overlay"><img src="${state.zoomUrl}" alt="Vergroessertes Notizbild" /></div>`
         : ""
     }
   `;
@@ -94,7 +101,7 @@ function docListTemplate(docs) {
 function viewHome() {
   return `
     <section class="card stack">
-      <h1 class="title">Notes Showcase</h1>
+      <h1 class="title">Notiz-Showcase</h1>
       <p class="hint">Schnell Notizen/Bilder speichern und später wiederfinden.</p>
       <button class="primary-btn" id="go-add">Dokument hinzufügen</button>
       <button class="secondary-btn" id="go-find">Dokument finden</button>
@@ -122,8 +129,8 @@ function viewAdd() {
         Kurzbeschreibung (Pflichtfeld)
         <input id="description-input" type="text" maxlength="120" value="${escapeHtml(state.addDraft.description)}" />
       </label>
-      <button class="primary-btn" id="save-doc" ${hasFile ? "" : "disabled"}>Save</button>
-      <button class="ghost-btn" id="back-home">Back</button>
+      <button class="primary-btn" id="save-doc" ${hasFile ? "" : "disabled"}>Speichern</button>
+      <button class="ghost-btn" id="back-home">Zurueck</button>
     </section>
   `;
 }
@@ -158,12 +165,12 @@ function viewFind() {
       ${
         noResults
           ? `<div class="stack">
-               <p class="hint">kürzlich hochgeladen</p>
+               <p class="hint">Kuerzlich hochgeladen</p>
                ${docListTemplate(state.recent)}
              </div>`
           : ""
       }
-      <button class="ghost-btn" id="back-home">Back</button>
+      <button class="ghost-btn" id="back-home">Zurueck</button>
     </section>
   `;
 }
@@ -173,7 +180,7 @@ async function viewDetail() {
   if (!doc) {
     return `
       <section class="card stack">
-        <h1 class="title">Document Detail</h1>
+        <h1 class="title">Dokumentdetails</h1>
         <p class="hint">Dokument nicht gefunden.</p>
         <button class="ghost-btn" id="go-find">Zurück zu Dokument finden</button>
       </section>
@@ -182,7 +189,7 @@ async function viewDetail() {
   const imageUrl = URL.createObjectURL(doc.blob);
   return `
     <section class="card stack">
-      <h1 class="title">Document Detail</h1>
+      <h1 class="title">Dokumentdetails</h1>
       <div class="image-panel">
         <img id="detail-image" src="${imageUrl}" alt="Gespeichertes Dokument" />
       </div>
@@ -193,7 +200,7 @@ async function viewDetail() {
       <div class="stack">
         <button class="secondary-btn" id="save-detail">Beschreibung speichern</button>
         <button class="danger-btn" id="delete-doc">Löschen</button>
-        <button class="ghost-btn" id="back-find">Back</button>
+        <button class="ghost-btn" id="back-find">Zurueck</button>
       </div>
       <div class="meta">${formatDateTime(doc.createdAt)}</div>
     </section>
@@ -202,7 +209,7 @@ async function viewDetail() {
 
 function registerServiceWorker() {
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./sw.js").catch(() => {
+    navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).catch(() => {
       // Silent fallback: showcase should still run without SW.
     });
   }
@@ -233,18 +240,22 @@ async function navigate(route, selectedId = null) {
 function getTutorialSteps() {
   return [
     {
+      route: "home",
       targetSelector: "#go-add",
       text: "Tippe auf Dokument hinzufügen, um ein Foto einer Notiz oder Karte schnell abzulegen.",
     },
     {
-      targetSelector: "#go-find",
-      text: "Mit Dokument finden suchst und öffnest du gespeicherte Notizen später wieder.",
+      route: "find",
+      targetSelector: "#search-input",
+      text: "Hier findest du deine Dokumente wieder. Suche oben direkt über die Beschreibung.",
     },
     {
+      route: "add",
       targetSelector: "#description-input",
-      text: "Eine kurze Beschreibung wie 'Muller - Ruckruf' hilft beim schnellen Wiederfinden.",
+      text: "Eine kurze Beschreibung wie 'Mueller - Rueckruf' hilft beim schnellen Wiederfinden.",
     },
     {
+      route: "home",
       targetSelector: "#help-btn",
       text: "Fertig. Mit dem Fragezeichen kannst du das Tutorial jederzeit wieder starten.",
     },
@@ -252,7 +263,16 @@ function getTutorialSteps() {
 }
 
 function openTutorial() {
-  startTutorial(getTutorialSteps());
+  startTutorial(getTutorialSteps(), {
+    // Non-trivial UX fix: each step now switches to the screen that is being explained.
+    onStepChange: async (step) => {
+      if (step.route && state.route !== step.route) {
+        await navigate(step.route);
+      } else {
+        await render();
+      }
+    },
+  });
 }
 
 async function handleFilePick(file) {

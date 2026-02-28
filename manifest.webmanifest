@@ -3,7 +3,7 @@
   "short_name": "FP Notes",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#f4f7fb",
-  "theme_color": "#102a43",
+  "background_color": "#0d0d0d",
+  "theme_color": "#0d0d0d",
   "description": "Offline Notes Showcase mit lokaler Speicherung in IndexedDB."
 }
