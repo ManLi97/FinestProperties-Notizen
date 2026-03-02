@@ -51,12 +51,10 @@ function baseLayout(content) {
     <main class="page">
       <div class="topbar">
         <div class="brand-wrap">
-          <img
-            class="brand-logo"
-            src="https://www.finestpropertiesmallorca.com/typo3conf/ext/finpropcore/Resources/Public/Logos/logo-desktop.png"
-            alt="Finest Properties Mallorca"
-          />
-          <p class="brand-tagline">Notiz-Showcase</p>
+          <div class="brand-wordmark">
+            <span class="brand-finest">Finest</span> <span class="brand-properties">Properties</span>
+          </div>
+          <div class="brand-byline">by Markus Redlich</div>
         </div>
         <button class="help-btn" id="help-btn" aria-label="Tutorial starten">Hilfe</button>
       </div>

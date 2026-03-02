@@ -2,7 +2,7 @@
 // Contract: Try network first for freshness, then fall back to cache offline.
 // Verify: After a UI change, reload once and confirm newest CSS/JS is applied.
 
-const CACHE_NAME = "fp-notes-showcase-v2";
+const CACHE_NAME = "fp-notes-showcase-v3";
 const ASSETS = [
   "./",
   "./index.html",
